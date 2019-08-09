@@ -1,19 +1,26 @@
 package com.java.bbblockchain.verticle;
 
 
+import com.google.gson.GsonBuilder;
 import com.java.bbblockchain.common.ResponseUtils;
 import com.java.bbblockchain.common.VerticleContext;
+import com.java.bbblockchain.models.Block;
+import com.java.bbblockchain.models.Customer;
+import com.java.bbblockchain.models.DistributionCenter;
+import com.java.bbblockchain.models.Order_items;
 import com.java.bbblockchain.service.BlockchainService;
 import com.java.bbblockchain.serviceimpl.BlockchainServiceImpl;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.vertx.core.Future;
+import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
 import io.vertx.reactivex.core.AbstractVerticle;
 import io.vertx.reactivex.ext.web.Router;
 import io.vertx.reactivex.ext.web.RoutingContext;
+import io.vertx.reactivex.ext.web.handler.BodyHandler;
 
-import  static  com.java.bbblockchain.common.BlockchainConstant.*;
+import static com.java.bbblockchain.common.BlockchainConstant.WELCOME_MESSAGE;
 
 
 /**
@@ -49,37 +56,26 @@ public class BlockChainVerticle extends AbstractVerticle {
 
 
         Router router = Router.router(vertx);
+
         router.errorHandler(HttpResponseStatus.BAD_REQUEST.code(), ResponseUtils::response);
+        router.route().handler(BodyHandler.create());
 
 
 
         router.get(config().getString("ROOT_API")).handler(this::rootApi);
-//        router.get(config().getString("HEALTH_CHECK_API")).handler(this::healthCheck);
-//
-//        router.get(config().getString("MEMBER_BY_ID_API"))
-//                .handler(io.vertx.reactivex.ext.web.api.validation.HTTPRequestValidationHandler.create().addPathParam("id", ParameterType.INT.INT))
-//                .handler(this::getMemberById);
-//
-//        router.get(config().getString("MEMBER_BY_UID_MOBILE")).handler(this::getMemberByUidMobile);
-//
-//        router.post(config().getString("SEND_OTP_API")).handler(this::sendOTP);
-//
-//        router.post(config().getString("VERIFY_OTP_API")).handler(this::verifyOTP);
-//
-//        router.post(config().getString("MEMBER_DETAILS_API")).handler(this::getMemberDetails);
-//
-//        router.put(config().getString("MEMBER_UPDATE_API")).handler(this::updateMemberDetails);
-//
-//
-//        router.route().handler(BodyHandler.create());
-//
-//        router.post(config().getString("KAPTURE_DETAILS_API"))
-//                .handler(routingContext -> BBSignUtils.validate("KAPTURE_DETAILS_API", config(), routingContext)).handler(this::getKaptureMemberDetails);
-//
-//
-//
-//        router.post(config().getString("BBSIGN_GENERATE")).handler(this::getBBSign);
+        router.get(config().getString("FARMER")).handler(this::getFarmer);
 
+        router.get(config().getString("DC")).handler(this::getDc);
+        router.get(config().getString("COLLECTION")).handler(this::getCollection);
+        router.get(config().getString("CUSTOMER")).handler(this::getCustomer);
+        router.get(config().getString("ORDER_ITEMS")).handler(this::getOrderItems);
+        router.get(config().getString("BLOCKCHAIN")).handler(this::getBlocBlockchain);
+
+
+        router.post(config().getString("COLLECTION")).handler(this::addCollectionCenter);
+        router.post(config().getString("DC")).handler(this::addDC);
+        router.post(config().getString("CUSTOMER")).handler(this::addCustomer);
+        router.post(config().getString("ORDER_ITEMS")).handler(this::addOrderItems);
 
 
         vertx.createHttpServer().requestHandler(router)
@@ -94,207 +90,105 @@ public class BlockChainVerticle extends AbstractVerticle {
                 });
     }
 
-//    private void getBBSign(RoutingContext routingContext) {
-//        String requestId = MemberUtils.getXTrackerId(routingContext.request());
-//        Single<String> bbSign = BBSignUtils.getBBSign(config(), routingContext);
-//        bbSign.subscribe(success -> {
-//            LOGGER.info("[getBBSign] request_id: " + requestId + " Result: " + success);
-//            ResponseUtils.response(HttpResponseStatus.OK, routingContext, new JsonObject().put("bbsign", success));
-//        }, failure -> {
-//            LOGGER.error("[getBBSign] request_id: " + requestId + " Error: " + failure);
-//            ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, routingContext);
-//        });
-//
-//    }
-//
-//
-//    @Override
-//    public void stop(Future<Void> stopFuture) throws Exception {
-//        super.stop(stopFuture);
-//    }
-//
-//
-//    /**
-//     * This method is mainly used for updating the member details
-//     *
-//     * @param rc Routing context
-//     */
-//    private void updateMemberDetails(RoutingContext rc) {
-//
-//        rc.request().setExpectMultipart(true).bodyHandler(req -> {
-//            MultiMap multiMap = rc.request().formAttributes();
-//
-//            Single<UpdateResult> updateResultSingle = memberService.updateMemberDetails(multiMap);
-//
-//            updateResultSingle.subscribe(success -> {
-//                ResponseUtils.response(HttpResponseStatus.OK, rc, "update consumer successful");
-//            }, throwable -> {
-//                ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, throwable.getMessage());
-//            });
-//        });
-//    }
-//
-//    /**
-//     * @param rc (Routing Context)
-//     */
-//    private void getMemberByUidMobile(RoutingContext rc) {
-//
-//        String id = rc.pathParam("uid");
-//        String mobileNo = rc.pathParam("mobile");
-//
-//        Single<ResultSet> memberResultSetSingle = memberService.getMemberDetailsByUidMobile(id, mobileNo);
-//        memberResultSetSingle.subscribe(memberResultSet -> {
-//                    if (memberResultSet.getNumRows() > 0) {
-//                        ResponseUtils.response(HttpResponseStatus.OK, rc, memberResultSet.getRows().get(0), SUCCESS);
-//                    } else {
-//                        ResponseUtils.response(HttpResponseStatus.NOT_FOUND, rc, new JsonObject(), MEMBER_NOT_FOUND_MESSAGE);
-//                    }
-//                },
-//                throwable -> {
-//                    ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//                });
-//    }
-//
-//
-//    /**
-//     * This method is mainly used for getting the kapture member details
-//     *
-//     * @param rc Which accepts the KaptureMemberRequest param
-//     */
-//    private void getKaptureMemberDetails(RoutingContext rc) {
-//        String requestId = MemberUtils.getXTrackerId(rc.request());
-//        LOGGER.info("requestId: " + requestId);
-//        JsonObject postBody = rc.getBodyAsJson();
-//        LOGGER.info("[getKaptureMemberDetails] request_id : " + requestId + " request : " + postBody);
-//        Maybe<KaptureMemReqResp> kaptureMemberDetails = memberService.getKaptureMemberDetails(postBody, requestId);
-//        kaptureMemberDetails.subscribe(kaptureMember ->
-//                {
-//                    ResponseUtils.response(HttpResponseStatus.OK, rc, kaptureMember.toJsonObject(), SUCCESS);
-//
-//                }, throwable -> {
-//                    ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//                },
-//                () -> {
-//                    ResponseUtils.response(HttpResponseStatus.NOT_FOUND, rc, MEMBER_NOT_FOUND_MESSAGE);
-//                });
-//    }
-//
-//    /**
-//     * Method responsible for get member details
-//     *
-//     * @param rc Routing context having Member request object(mobile, email,customerId)
-//     */
-//    private void getMemberDetails(RoutingContext rc) {
-//        rc.request().bodyHandler(postBody -> {
-//            Single<ResultSet> members = memberService.getMemberDetails(postBody);
-//            members.subscribe(resultSet -> {
-//                if (resultSet.getNumRows() > 0) {
-//                    ResponseUtils.response(HttpResponseStatus.OK, rc, resultSet.getRows().get(0));
-//                } else {
-//                    ResponseUtils.response(HttpResponseStatus.NOT_FOUND, rc, new JsonObject(), MEMBER_NOT_FOUND_MESSAGE);
-//                }
-//            }, throwable ->
-//            {
-//                ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//            });
-//        });
-//    }
-//
-//    /**
-//     * Method is responsible for verify otp
-//     *
-//     * @param rc Request param expecting (OTP code and mobile no)
-//     */
-//    private void verifyOTP(RoutingContext rc) {
-//        rc.request().bodyHandler(postBody -> {
-//            Single<JsonObject> verifyOTPSingle = memberService.verifyOTP(postBody.toJsonObject());
-//            verifyOTPSingle.subscribe(verifyOTPJson -> {
-//                ResponseUtils.response(HttpResponseStatus.OK, rc, verifyOTPJson);
-//            }, throwable -> {
-//                ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//            });
-//        });
-//    }
-//
-//    /**
-//     * Responsible for send otp
-//     *
-//     * @param rc (Routing context having mobile no)
-//     */
-//    private void sendOTP(RoutingContext rc) {
-//        rc.request().bodyHandler(postBody -> {
-//            Single<JsonObject> sendOTPSingle = memberService.sendOTP(postBody.toJsonObject());
-//            sendOTPSingle.subscribe(sendOTPJson -> {
-//                ResponseUtils.response(HttpResponseStatus.OK, rc, sendOTPJson, SUCCESS);
-//            }, throwable -> {
-//                ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//            });
-//        });
-//    }
-//
-//    /**
-//     * This method for getting member details by member id
-//     *
-//     * @param rc Routing context having member id as path param
-//     */
-//
-//    private void getMemberById(RoutingContext rc) {
-//
-//        int id = Integer.parseInt(rc.request().getParam("id"));
-//        Single<ResultSet> members = memberService.getMemberDetailsById(id);
-//
-//        members.subscribe(resultSet -> {
-//            if (resultSet.getNumRows() > 0) {
-//                ResponseUtils.response(HttpResponseStatus.OK, rc, resultSet.getRows().get(0));
-//            } else {
-//                ResponseUtils.response(HttpResponseStatus.NOT_FOUND, rc, new JsonObject(), MEMBER_NOT_FOUND_MESSAGE);
-//            }
-//        }, throwable -> {
-//            ResponseUtils.response(HttpResponseStatus.BAD_REQUEST, rc, BAD_REQUEST_RESPONSE);
-//        });
-//    }
-//
-//
-//    /**
-//     * This is basic root api for testing
-//     *
-//     * @param rc (Routing Context Object)
-//     */
-//
-//
+
+    private void getFarmer(RoutingContext rc)
+    {
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.farmerHashMap));
+    }
+
+    private void getDc(RoutingContext rc)
+    {
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.distributionCenterHashMap));
+
+    }
+
+    private void getCustomer(RoutingContext rc)
+    {
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.customerHashMap));
+
+    }
+
+    private void getCollection(RoutingContext rc)
+    {
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.collectionCenterHashMap));
+
+    }
+
+
+    private void getOrderItems(RoutingContext rc)
+    {
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.order_itemsHashMap));
+    }
+
+    private  void addCollectionCenter(RoutingContext rc)
+    {
+        JsonObject jsonObject = rc.getBodyAsJson();
+        System.out.println("collection :"+jsonObject);
+        blockchainService.addCollection(jsonObject.getInteger("skuId"),jsonObject.getInteger("quantity"));
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.collectionCenterHashMap));
+    }
+
+    private  void  addDC(RoutingContext rc)
+    {
+        JsonObject jsonObject = rc.getBodyAsJson();
+        System.out.println("dc :"+jsonObject);
+        DistributionCenter dc = DistributionCenter.fromMemberRequestJsonObject(jsonObject);
+        blockchainService.addDC(dc);
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.distributionCenterHashMap));
+    }
+
+    private  void  addCustomer(RoutingContext rc)
+    {
+        JsonObject jsonObject = rc.getBodyAsJson();
+        System.out.println("customer :"+jsonObject);
+        Customer customer = Customer.fromMemberRequestJsonObject(jsonObject);
+        blockchainService.addCustomer(customer);
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.customerHashMap));
+    }
+
+
+    private  void  addOrderItems(RoutingContext rc)
+    {
+        JsonObject jsonObject = rc.getBodyAsJson();
+        Order_items order_items = Order_items.fromMemberRequestJsonObject(jsonObject);
+        System.out.println("Order_Items "+order_items);
+        blockchainService.addOrder_Items(order_items);
+        ResponseUtils.response(HttpResponseStatus.OK, rc,new GsonBuilder().create().toJson(VerticleContext.order_itemsHashMap));
+
+    }
+
+
+    public  void getBlocBlockchain(RoutingContext rc)
+    {
+        String blockJson = new GsonBuilder().create().toJson(VerticleContext.blockChainArrayList);
+        ResponseUtils.response(HttpResponseStatus.OK, rc,blockJson);
+    }
+
  private void rootApi(RoutingContext rc) {
         ResponseUtils.response(HttpResponseStatus.OK, rc, WELCOME_MESSAGE);
    }
+
+
+//    public static Boolean isChainValid() {
+//        Block currentBlock;
+//        Block previousBlock;
 //
-//
-//    /**
-//     * This method responsible for basic health check
-//     *
-//     * @param rc (Routing Context Object)
-//     */
-//
-//
-//    private void healthCheck(RoutingContext rc) {
-//        ResponseUtils.response(HttpResponseStatus.OK, rc, HEALTH_CHECK_MESSAGE + config().getInteger("APP_PORT"));
-//    }
-//
-//
-//    private void callMemberCommunicationService(RoutingContext routingContext) {
-//
-//            JsonObject requestJson = routingContext.getBodyAsJson();
-//            Single<JsonObject> response= memberCommunicationService.getCommunicationRequest(requestJson);
-//
-//            response.subscribe(result->{
-//                if(!result.getBoolean("status")){
-//                    ResponseUtils.response(HttpResponseStatus.BAD_REQUEST,result.getString(MESSAGE),routingContext,requestJson.getString(CONTEXT_ID));
-//                }
-//                else{
-//                    ResponseUtils.response(HttpResponseStatus.OK,SUCCESS,routingContext,requestJson.getString(CONTEXT_ID));
-//                }
-//        },throwable -> {
-//                ResponseUtils.response(HttpResponseStatus.BAD_REQUEST,throwable.getMessage(),routingContext,requestJson.getString(CONTEXT_ID));
-//            });
-//
+//        //loop through blockchain to check hashes:
+//        for(int i=1; i < VerticleContext.blockChainArrayList.size(); i++) {
+//            currentBlock = VerticleContext.blockChainArrayList.get(i);
+//            previousBlock = VerticleContext.blockChainArrayList.get(i-1);
+//            //compare registered hash and calculated hash:
+//            if(!currentBlock.getCurrHash().equals(currentBlock.getObject().calculateHash()) ){
+//                System.out.println("Current Hashes not equal");
+//                return false;
+//            }
+//            //compare previous hash and registered previous hash
+//            if(!previousBlock.hash.equals(currentBlock.previousHash) ) {
+//                System.out.println("Previous Hashes not equal");
+//                return false;
+//            }
+//        }
+//        return true;
 //    }
 }
 
